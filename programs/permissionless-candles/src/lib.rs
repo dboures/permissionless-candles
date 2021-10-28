@@ -19,7 +19,7 @@ pub mod permissionless_candles {
 
 #[derive(Accounts)]
 pub struct Create<'info> {
-    #[account(init, payer = updater, space = 8 + 2914)]
+    #[account(zero)]
     pub candle_frame: Loader<'info, CandleFrame>,
     #[account(mut)]
     pub updater: Signer<'info>,
@@ -37,11 +37,11 @@ pub struct Create<'info> {
 // }
 
 
+
 #[account(zero_copy)]
 pub struct CandleFrame {
     pub updater: Pubkey,       // 32
-    head: u8, // 1
-    tail: u8, // 1
+    head: u64,         // 8
     // pub resolution : not sure
     pub candles: [Candle ; 30] // 96 * 30 = 2880
 }
@@ -49,13 +49,13 @@ pub struct CandleFrame {
 impl CandleFrame {
     fn append(&mut self, candle: Candle) {
         self.candles[CandleFrame::index_of(self.head)] = candle;
-        if CandleFrame::index_of(self.head + 1) == CandleFrame::index_of(self.tail) {
-            self.tail += 1;
+        self.head = (self.head + 1) % 30;
+        if self.head == 30 {
+            self.head = 0
         }
-        self.head += 1;
     }
-    fn index_of(counter: u8) -> usize {
-        std::convert::TryInto::try_into(counter % 30).unwrap() // mod by max # of candles
+    fn index_of(value: u64) -> usize {
+        std::convert::TryInto::try_into(value).unwrap() // mod by max # of candles
     }
 }
 

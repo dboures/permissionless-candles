@@ -1,24 +1,31 @@
 const anchor = require('@project-serum/anchor');
+const assert = require("assert");
 
 describe('permissionless-candles', () => {
 
   const provider = anchor.Provider.local();
   anchor.setProvider(provider);
 
-  it('Is initialized!', async () => {
-    // Add your test here.
-    const program = anchor.workspace.PermissionlessCandles;
+  const program = anchor.workspace.PermissionlessCandles;
+  const candleFrame = anchor.web3.Keypair.generate();
 
-    const candleFrameKeypair = anchor.web3.Keypair.generate();
-    const tx = await program.rpc.create(
-      {
+
+  it('Creates a container for candles', async () => {
+    await program.rpc.create({
       accounts: {
-        candleFrame: candleFrameKeypair.publicKey,
+        candleFrame: candleFrame.publicKey,
         updater: provider.wallet.payer.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       },
-      signers: [provider.wallet.payer, candleFrameKeypair]
+      instructions: [
+        await program.account.candleFrame.createInstruction(candleFrame), // Why do we need to do it this way? I assume because of loader?
+      ],
+      signers: [candleFrame],
     });
-    console.log("Your transaction signature", tx);
+
+    const res = await program.account.candleFrame.fetch(candleFrame.publicKey);
+    assert.ok(res.candles.length === 30);
+    assert.ok(res.head.toNumber() === 0);
+
   });
 });
