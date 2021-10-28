@@ -12,38 +12,55 @@ pub mod permissionless_candles {
         Ok(())
     }
 
-    // pub fn update(ctx: Context<Update>) -> ProgramResult {
-    //     Ok(())
-    // }
+    pub fn update(
+        ctx: Context<Update>,
+        open: u128, // TODO: really unwieldy, but I'm not sure if I can pass an object (bc Serialize is req'd) and use zero copy
+        high: u128,
+        low: u128,
+        close: u128,
+        volume: u128,
+        unix_time: u128,
+    ) -> ProgramResult {
+        let mut candle_frame = ctx.accounts.candle_frame.load_mut()?;
+        candle_frame.append({
+            Candle {
+                open,
+                high,
+                low,
+                close,
+                volume,
+                unix_time,
+            }
+        });
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
 pub struct Create<'info> {
     #[account(zero)]
     pub candle_frame: Loader<'info, CandleFrame>,
-    #[account(mut)]
-    pub updater: Signer<'info>,
+    #[account(signer)]
+    pub updater: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
 
-//Need to verify that the right person is updating
-// #[derive(Accounts)]
-// pub struct Update<'info> {
-//     #[account(init, payer = updater, space = 8 + 2914)]
-//     pub candle_frame: Loader<'info, CandleFrame>,
-//     #[account(mut)]
-//     pub updater: Signer<'info>,
-//     pub system_program: Program<'info, System>,
-// }
-
-
+#[derive(Accounts)]
+pub struct Update<'info> {
+    #[account(mut, has_one = updater)]
+    pub candle_frame: Loader<'info, CandleFrame>,
+    #[account(signer)]
+    pub updater: AccountInfo<'info>,
+}
 
 #[account(zero_copy)]
 pub struct CandleFrame {
-    pub updater: Pubkey,       // 32
-    head: u64,         // 8
-    // pub resolution : not sure
-    pub candles: [Candle ; 30] // 96 * 30 = 2880
+    pub updater: Pubkey, // 32
+    head: u64,           // 8
+    // pub resolution : string like?
+    // pub base: Pubkey, // TODO: add base and quote addresses to frame creation
+    // pub quote: Pubkey,
+    pub candles: [Candle; 30], // 96 * 30 = 2880
 }
 
 impl CandleFrame {
@@ -60,7 +77,8 @@ impl CandleFrame {
 }
 
 #[zero_copy]
-pub struct Candle { // 16 * 6 = 96
+pub struct Candle {
+    // 16 * 6 = 96
     open: u128,
     high: u128,
     low: u128,
